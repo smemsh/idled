@@ -1,0 +1,145 @@
+#!/usr/bin/env python3
+"""
+"""
+__url__     = 'http://smemsh.net/src/idled/'
+__author__  = 'Scott Mcdermott <scott@smemsh.net>'
+__license__ = 'GPL-2.0'
+
+import argparse
+
+from sys import argv, stdin, stdout, stderr, exit
+from time import sleep
+from subprocess import check_output
+
+from os.path import basename, dirname, isdir, exists
+from os import (
+    getenv, chdir, read,
+    lseek, SEEK_SET,
+    open as osopen, O_RDONLY,
+    EX_OK as EXIT_SUCCESS,
+    EX_SOFTWARE as EXIT_FAILURE,
+)
+
+#
+# interrupts
+# ----------
+# keyboard: 1 (in /proc/interrupts would be i8042)
+# touchpad: 144 (also 14, 17 but 144 is closest: DLL096D:01, may have to parse
+#   /proc/interrupts and look up this symbolic name because the allocated
+#   interrupt might vary each boot)
+# todo: external keyboard
+#
+# lookup symbol in /sys/kernel/irq/*/actions
+#   i8042 -> keyboard, DLL096D:01 -> touchpad
+###
+
+IRQ_TIMEOUT = 5
+IRQ_KEYBOARD = 1
+IRQ_TOUCHPAD = 144
+IRQS = [IRQ_KEYBOARD, IRQ_TOUCHPAD]
+
+#
+
+def err(*args, **kwargs):
+    print(*args, file=stderr, **kwargs)
+
+def bomb(*args):
+    err(*args)
+    exit(EXIT_FAILURE)
+
+def dprint(*args, **kwargs):
+    if not debug: return
+    err('debug:', *args, **kwargs)
+
+def exe(cmd):
+    return check_output(cmd.split()).splitlines()
+
+###
+
+def process_args():
+
+    global args
+
+    def addflag(p, flagchar, longopt, help=None, /, **kwargs):
+        options = list(("-%s --%s" % (flagchar, longopt)).split())
+        p.add_argument(*options, action='store_true', help=help, **kwargs)
+
+    # todo: unused
+    def addarg(p, vname, vdesc, help=None, /, **kwargs):
+        p.add_argument(vname, nargs='?', metavar=vdesc, help=help, **kwargs)
+
+    p = argparse.ArgumentParser(
+        prog            = invname,
+        description     = __doc__.strip(),
+        allow_abbrev    = False,
+        formatter_class = argparse.RawTextHelpFormatter,
+    )
+    addflag (p, 'd', 'debug')
+
+    args = p.parse_args(args)
+
+
+def check_sanity():
+    pass
+
+###
+
+def idled():
+
+    irqn = IRQ_KEYBOARD
+    fd = osopen(f"{irqn}/per_cpu_count", O_RDONLY)
+
+    highest = {}
+    highest[irqn] = 0
+
+    # inotify doesn't notice modifies, and select returns immediately, so
+    # we're forced to parse and count at intervals.  no event mechanism known
+    while True:
+        c = 0
+        h = highest[irqn]
+        for v in read(fd, 999).decode().split(','): c += int(v)
+        if c > h:
+            highest[irqn] = c # new highest seen
+            print(h)
+        if c < h:
+            bomb("impossible less than previous highest")
+        lseek(fd, 0, SEEK_SET)
+        sleep(1)
+
+###
+
+def main():
+
+    if debug == 1:
+        breakpoint()
+
+    process_args()
+    check_sanity()
+
+    chdir("/sys/kernel/irq")
+
+    try: subprogram = globals()[invname]
+    except (KeyError, TypeError):
+        bomb(f"unimplemented command '{invname}'")
+
+    return subprogram()
+
+###
+
+if __name__ == "__main__":
+
+    from sys import hexversion
+    if hexversion < 0x03090000:
+        bomb("minimum python 3.9")
+
+    from bdb import BdbQuit
+    debug = int(getenv('DEBUG') or 0)
+    if debug:
+        from pprint import pp
+        err('debug: enabled')
+
+    invname = basename(argv[0])
+    args = argv[1:]
+
+    try: main()
+    except BdbQuit: bomb("debug: stop")
