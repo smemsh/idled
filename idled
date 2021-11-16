@@ -51,6 +51,11 @@ def dprint(*args, **kwargs):
     if not debug: return
     err('debug:', *args, **kwargs)
 
+def dprintvar(name, vars):
+    if not debug: return
+    err(f"debug: {name}")
+    pp(vars[name])
+
 def exe(cmd):
     return check_output(cmd.split()).splitlines()
 
