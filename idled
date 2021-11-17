@@ -7,36 +7,61 @@ __license__ = 'GPL-2.0'
 
 import argparse
 
-from sys import argv, stdin, stdout, stderr, exit
-from time import sleep
+from os import killpg, getpgid
+from sys import argv, stderr, exit
+from glob import glob
+from enum import Enum
+from struct import calcsize, iter_unpack
+from signal import SIGTERM
+from asyncio import to_thread, create_task, wait, run, FIRST_EXCEPTION
 from subprocess import check_output
 
-from os.path import basename, dirname, isdir, exists
+from os.path import basename
 from os import (
-    getenv, chdir, read,
-    lseek, SEEK_SET,
+    getenv,
+    chdir, read,
     open as osopen, O_RDONLY,
     EX_OK as EXIT_SUCCESS,
     EX_SOFTWARE as EXIT_FAILURE,
 )
 
+## /usr/include/linux/input.h:
+# struct input_event
+# {
+#     # sys/time.h bits/types/struct_timeval.h bits/types.h bits/typesizes.h
+#     struct timeval time; # long int, long int
+#     __u16 type;
+#     __u16 code;
+#     __s32 value;
+# }
 #
-# interrupts
-# ----------
-# keyboard: 1 (in /proc/interrupts would be i8042)
-# touchpad: 144 (also 14, 17 but 144 is closest: DLL096D:01, may have to parse
-#   /proc/interrupts and look up this symbolic name because the allocated
-#   interrupt might vary each boot)
-# todo: external keyboard
+## linux x86_64 (LP64): long 8, long 8, ushort 2, ushort 2, int 4 == 24 bytes
+# $ cc -xc - << %; ./a.out
+# #include <linux/input.h>
+# #include <stdio.h>
+# void main (void) { printf("size: %zu\n", sizeof(struct input_event)); }
+# %
+# size: 24
 #
-# lookup symbol in /sys/kernel/irq/*/actions
-#   i8042 -> keyboard, DLL096D:01 -> touchpad
-###
+EVFMT = "llHHi"
+EVSIZE = calcsize(EVFMT)
+EVBUFSZ = EVSIZE << 10 # should always exhaust unread supply
 
-IRQ_TIMEOUT = 5
-IRQ_KEYBOARD = 1
-IRQ_TOUCHPAD = 144
-IRQS = [IRQ_KEYBOARD, IRQ_TOUCHPAD]
+# /usr/include/linux/input-event-codes.h
+class Evtype(Enum):
+    EV_SYN = 0x00 # sync packet, code: 0 = SYN_REPORT, 3 = SYN_DROPPED
+    EV_KEY = 0x01 # code: 0-255 kbd, > 255 buttons, val: press = 1 release = 0
+    EV_REL = 0x02 # mouse relative position (mouse and touchpad)
+    EV_ABS = 0x03 # mouse absolute position (touchpad only)
+
+# TODO interrupts leeway before triggering not-idle (eg accidental inputs)
+IRQTHRESHOLD = 3
+
+# TODO wake up and check interrupt counters this often (seconds)
+POLLSECS = 5
+
+# global current idle state, script maintains while it runs
+idle = True
 
 #
 
@@ -89,27 +114,88 @@ def check_sanity():
 
 ###
 
+def get_keyboard_event_paths():
+    pass
+
+def get_mouse_event_paths():
+    pass
+
+def get_event_paths():
+    paths = {}
+    for suffix in ['kbd', 'mouse']:
+        paths[suffix] = glob(f"/dev/input/by-path/*-event-{suffix}")
+    return paths
+
+#
+
+def update_counts(cntsobj, counts=None):
+    if not counts:
+        pass
+
+# get a batch of event packets from given input device fd and update
+# counters.  we should always get a multiple of EVSIZE from the read(),
+# and each set of batched EVSIZE events will always terminate with an
+# EV_SYN event.  in testing, each read() got exactly one set of related
+# events (ie, only one EV_SYN was present in the read buffer, and it was
+# always the last input_event), but we don't know for sure if multiple
+# event sets can come from a single read()
+#
+def queue_events(fd):
+
+    while True:
+
+        seen = processed = 0
+        kevs = mevs = 0
+
+        for event in iter_unpack(EVFMT, read(fd, EVBUFSZ)):
+            _, _, itype, code, val = event
+            seen += 1
+            try: t = Evtype(itype)
+            except ValueError:
+                continue # ignore unknown types
+            if debug:
+                dprint(f"fd{fd}: type:{itype}, code:{code}, value:{val}")
+            if t is Evtype.EV_KEY:
+                if code <= 255 and val == 1: # ignore buttons and key releases
+                    kevs += 1
+            elif t is Evtype.EV_SYN:
+                # we don't care to count batches, only events.  we don't
+                # care about SYN_DROPPED either: unlikely, and safe to ignore
+                continue
+            else:
+                mevs += 1
+            processed += 1
+
+        if t is not Evtype.EV_SYN:
+            bomb(f"fd {fd}: sync packet not last!")
+
+        if debug:
+            dprint(f"fd{fd}: saw {seen}, processed {processed}, "
+                   f"key {kevs}, mouse {mevs}")
+
+async def monitor(fds):
+
+    tasks = []
+    for fd in fds:
+        tasks.append(create_task(to_thread(queue_events, fd)))
+
+    await wait(tasks, return_when=FIRST_EXCEPTION)
+
+    dprint("monitor done")
+
+
 def idled():
 
-    irqn = IRQ_KEYBOARD
-    fd = osopen(f"{irqn}/per_cpu_count", O_RDONLY)
+    paths = sum(get_event_paths().values(), [])
+    dprintvar('paths', vars())
 
-    highest = {}
-    highest[irqn] = 0
+    fds = [osopen(path, O_RDONLY) for path in paths]
 
-    # inotify doesn't notice modifies, and select returns immediately, so
-    # we're forced to parse and count at intervals.  no event mechanism known
-    while True:
-        c = 0
-        h = highest[irqn]
-        for v in read(fd, 999).decode().split(','): c += int(v)
-        if c > h:
-            highest[irqn] = c # new highest seen
-            print(h)
-        if c < h:
-            bomb("impossible less than previous highest")
-        lseek(fd, 0, SEEK_SET)
-        sleep(1)
+    try: run(monitor(fds))
+    except KeyboardInterrupt: killpg(getpgid(0), SIGTERM)
+    # ^^^ todo why requires ctrl-c twice?
+
+    exit(EXIT_SUCCESS)
 
 ###
 
@@ -121,7 +207,7 @@ def main():
     process_args()
     check_sanity()
 
-    chdir("/sys/kernel/irq")
+    chdir("/")
 
     try: subprogram = globals()[invname]
     except (KeyError, TypeError):
