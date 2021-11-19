@@ -5,14 +5,13 @@ __url__     = 'http://smemsh.net/src/idled/'
 __author__  = 'Scott Mcdermott <scott@smemsh.net>'
 __license__ = 'GPL-2.0'
 
-import argparse
-
 from sys import argv, stderr, exit
 from glob import glob
 from enum import Enum
 from struct import calcsize, iter_unpack
 from signal import SIGTERM
 from asyncio import to_thread, create_task, wait, run, FIRST_EXCEPTION
+from argparse import ArgumentParser, RawTextHelpFormatter
 from subprocess import check_output
 
 from os.path import basename
@@ -96,11 +95,11 @@ def process_args():
     def addarg(p, vname, vdesc, help=None, /, **kwargs):
         p.add_argument(vname, nargs='?', metavar=vdesc, help=help, **kwargs)
 
-    p = argparse.ArgumentParser(
+    p = ArgumentParser(
         prog            = invname,
         description     = __doc__.strip(),
         allow_abbrev    = False,
-        formatter_class = argparse.RawTextHelpFormatter,
+        formatter_class = RawTextHelpFormatter,
     )
     addflag (p, 'd', 'debug')
 
