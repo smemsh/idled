@@ -144,7 +144,10 @@ def queue_events(fd):
         seen = processed = 0
         kevs = mevs = 0
 
-        for event in iter_unpack(EVFMT, read(fd, EVBUFSZ)):
+        try: evbuf = read(fd, EVBUFSZ)
+        except Exception as e: err(f"exception: {e}"); raise
+
+        for event in iter_unpack(EVFMT, evbuf):
             _, _, itype, code, val = event
             seen += 1
             try: t = Evtype(itype)
@@ -170,6 +173,14 @@ def queue_events(fd):
             dprint(f"fd{fd}: saw {seen}, processed {processed}, "
                    f"key {kevs}, mouse {mevs}")
 
+# spawn threads to block on input events and queue the ones we care
+# about.  note: to_thread() uses ThreadPoolExecutor which
+# makes daemon threads, and therefore exceptions are not automatically
+# printed (main thread dies and program is terminated), so portions of
+# these tasks that can except need to catch/print/raise themselves. see
+#  https://stackoverflow.com/questions/875453
+#  https://stackoverflow.com/questions/49992329
+#
 async def monitor_events(fds):
 
     tasks = []
