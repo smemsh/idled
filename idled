@@ -170,7 +170,7 @@ def queue_events(fd):
             dprint(f"fd{fd}: saw {seen}, processed {processed}, "
                    f"key {kevs}, mouse {mevs}")
 
-async def monitor(fds):
+async def monitor_events(fds):
 
     tasks = []
     for fd in fds:
@@ -188,7 +188,7 @@ def idled():
 
     fds = [osopen(path, O_RDONLY) for path in paths]
 
-    try: run(monitor(fds))
+    try: run(monitor_events(fds))
     except KeyboardInterrupt: killpg(getpgid(0), SIGTERM)
     # ^^^ todo why requires ctrl-c twice?
 
