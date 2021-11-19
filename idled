@@ -7,7 +7,8 @@ __license__ = 'GPL-2.0'
 
 from sys import argv, stderr, exit
 from glob import glob
-from enum import Enum
+from enum import Enum, IntEnum
+from queue import SimpleQueue
 from struct import calcsize, iter_unpack
 from signal import SIGTERM
 from asyncio import to_thread, create_task, wait, run, FIRST_EXCEPTION
@@ -50,6 +51,17 @@ class Evtype(Enum):
     EV_KEY = 0x01 # code: 0-255 kbd, > 255 buttons, val: press = 1 release = 0
     EV_REL = 0x02 # mouse relative position (mouse and touchpad)
     EV_ABS = 0x03 # mouse absolute position (touchpad only)
+
+# mouse and keyboard event queue inserted by input device monitor threads
+evq = SimpleQueue()
+
+# one queue for keyboard and mouse events, inserted as (Qtype, count) tuples
+class Qtype(IntEnum):
+    QT_KEY = 0
+    QT_MOUSE = 1
+
+# global event counters (incremented via queues) indexed by Qtype
+events = [0, 0]
 
 # TODO interrupts leeway before triggering not-idle (eg accidental inputs)
 IRQTHRESHOLD = 3
@@ -173,8 +185,21 @@ def queue_events(fd):
             dprint(f"fd{fd}: saw {seen}, processed {processed}, "
                    f"key {kevs}, mouse {mevs}")
 
+        if kevs: evq.put((Qtype.QT_KEY, kevs))
+        if mevs: evq.put((Qtype.QT_MOUSE, mevs))
+
+
+def process_events():
+
+    while True:
+        qtype, count = evq.get()
+        events[qtype] += count
+        print(f"events: {events}")
+
+
 # spawn threads to block on input events and queue the ones we care
-# about.  note: to_thread() uses ThreadPoolExecutor which
+# about.  then we have another thread that blocks on queue.get() and
+# processes the events.  note: to_thread() uses ThreadPoolExecutor which
 # makes daemon threads, and therefore exceptions are not automatically
 # printed (main thread dies and program is terminated), so portions of
 # these tasks that can except need to catch/print/raise themselves. see
@@ -186,6 +211,8 @@ async def monitor_events(fds):
     tasks = []
     for fd in fds:
         tasks.append(create_task(to_thread(queue_events, fd)))
+
+    tasks.append(create_task(to_thread(process_events)))
 
     await wait(tasks, return_when=FIRST_EXCEPTION)
 
