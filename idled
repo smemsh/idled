@@ -7,7 +7,6 @@ __license__ = 'GPL-2.0'
 
 import argparse
 
-from os import killpg, getpgid
 from sys import argv, stderr, exit
 from glob import glob
 from enum import Enum
@@ -18,8 +17,7 @@ from subprocess import check_output
 
 from os.path import basename
 from os import (
-    getenv,
-    chdir, read,
+    getenv, chdir, read, killpg, getpgid,
     open as osopen, O_RDONLY,
     EX_OK as EXIT_SUCCESS,
     EX_SOFTWARE as EXIT_FAILURE,
