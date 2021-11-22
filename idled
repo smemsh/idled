@@ -60,8 +60,9 @@ class Qtype(IntEnum):
     QT_KEY = 0
     QT_MOUSE = 1
 
-# global event counters (incremented via queues) indexed by Qtype
+# global event counter and last seen packet time.time(), indexed by Qtype
 events = [0, 0]
+lastseen = [0.0, 0.0]
 
 # TODO interrupts leeway before triggering not-idle (eg accidental inputs)
 IRQTHRESHOLD = 3
@@ -160,7 +161,7 @@ def queue_events(fd):
         except Exception as e: err(f"exception: {e}"); raise
 
         for event in iter_unpack(EVFMT, evbuf):
-            _, _, itype, code, val = event
+            secs, usecs, itype, code, val = event
             seen += 1
             try: t = Evtype(itype)
             except ValueError:
@@ -185,16 +186,20 @@ def queue_events(fd):
             dprint(f"fd{fd}: saw {seen}, processed {processed}, "
                    f"key {kevs}, mouse {mevs}")
 
-        if kevs: evq.put((Qtype.QT_KEY, kevs))
-        if mevs: evq.put((Qtype.QT_MOUSE, mevs))
+        # struct timeval fields to time.time() float
+        timetime = secs + usecs / 1000000.0
+
+        if kevs: evq.put((Qtype.QT_KEY, timetime, kevs))
+        if mevs: evq.put((Qtype.QT_MOUSE, timetime, mevs))
 
 
 def process_events():
 
     while True:
-        qtype, count = evq.get()
+        qtype, timetime, count = evq.get()
         events[qtype] += count
-        print(f"events: {events}")
+        lastseen[qtype] = timetime
+        print(f"events: {lastseen} {events}")
 
 
 # spawn threads to block on input events and queue the ones we care
