@@ -7,7 +7,9 @@ __license__ = 'GPL-2.0'
 
 from sys import argv, stderr, exit
 from glob import glob
+from copy import copy
 from enum import Enum, IntEnum
+from time import time as nowtime
 from queue import SimpleQueue
 from struct import calcsize, iter_unpack
 from signal import SIGTERM
@@ -57,10 +59,15 @@ evq = SimpleQueue()
 class Qtype(IntEnum):
     QT_KEY = 0
     QT_MOUSE = 1
+qtypen = len(list(Qtype))
 
-# global event counter and last seen packet time.time(), indexed by Qtype
-events = [0, 0]
-lastseen = [0.0, 0.0]
+# idle flag will drop if N events of type Qtype in S seconds
+unidle_n = [0] * qtypen
+unidle_s = copy(unidle_n)
+unidle_n[Qtype.QT_KEY] = 3
+unidle_s[Qtype.QT_KEY] = 10
+unidle_n[Qtype.QT_MOUSE] = 60
+unidle_s[Qtype.QT_MOUSE] = 7
 
 # global current idle state, script maintains while it runs
 idle = True
@@ -175,11 +182,52 @@ def queue_events(fd):
 
 def process_events():
 
+    # precreate fixed-length (given by unidle number for each input
+    # type) list of recent event timestamps, and prime all entries with
+    # the start time.  we'll keep an index to the current timestamp
+    # entry for writing each event as we receive it, and make it
+    # circular by incrementing, modulo list length, each iteration
+    #
+    index = [0] * qtypen
+    events = [[]] * qtypen
+    for qt in Qtype:
+        v = qt.value
+        events[v] = [nowtime()] * unidle_n[v]
+
     while True:
+
+        # block until an event is read on any of the input devices
         qtype, timetime, count = evq.get()
-        events[qtype] += count
-        lastseen[qtype] = timetime
-        print(f"events: {lastseen} {events}")
+
+        # oldest entry, at oldidx, will always be the slot after newest
+        # (current event) index, which is the same as the maximally
+        # previous one counting backwards (circularly).  we'll follow it
+        # and compare current event to oldest each loop to see if less
+        # than unidle_s secs have elapsed, which means we're no longer
+        # idle
+        #
+        for _ in range(count):
+            #
+            # we have to repeat this count times for multiple event
+            # input batches like we receive from mouse.  in fact this
+            # isn't fair because we only have a "mouse" and "keyboard"
+            # unidle_n, but touchpad events are quite a bit more
+            # voluminous than mouse events.  the only way around this is
+            # to either (1) have a separate queue for touchpad vs mouse,
+            # or (2) ignore the count (don't even add it to the queue)
+            # and and treat each "batch" as one significant event for a
+            # given qtype.  this might actually be the best idea.  we'd
+            # end up counting EV_SYNs, which are roughly equivalent
+            # between mouse and touchpad.  all events in an
+            # EV_SYN-demarcated batch appear to have the same timestamp
+            # anyways TODO
+            #
+            events[qtype][index[qtype]] = timetime
+            idxoldest = (index[qtype] + 1) % unidle_n[qtype]
+            timeoldest = events[qtype][idxoldest]
+            if (timetime - timeoldest) < unidle_s[qtype]:
+                print("would unidled")
+            index[qtype] = idxoldest
 
 
 # spawn threads to block on input events and queue the ones we care
