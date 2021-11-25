@@ -62,12 +62,6 @@ class Qtype(IntEnum):
 events = [0, 0]
 lastseen = [0.0, 0.0]
 
-# TODO interrupts leeway before triggering not-idle (eg accidental inputs)
-IRQTHRESHOLD = 3
-
-# TODO wake up and check interrupt counters this often (seconds)
-POLLSECS = 5
-
 # global current idle state, script maintains while it runs
 idle = True
 
@@ -122,23 +116,11 @@ def check_sanity():
 
 ###
 
-def get_keyboard_event_paths():
-    pass
-
-def get_mouse_event_paths():
-    pass
-
 def get_event_paths():
     paths = {}
     for suffix in ['kbd', 'mouse']:
         paths[suffix] = glob(f"/dev/input/by-path/*-event-{suffix}")
     return paths
-
-#
-
-def update_counts(cntsobj, counts=None):
-    if not counts:
-        pass
 
 # get a batch of event packets from given input device fd and update
 # counters.  we should always get a multiple of EVSIZE from the read(),
