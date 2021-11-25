@@ -25,13 +25,11 @@ from os import (
 
 ## /usr/include/linux/input.h:
 # struct input_event
-# {
-#     # sys/time.h bits/types/struct_timeval.h bits/types.h bits/typesizes.h
-#     struct timeval time; # long int, long int
-#     __u16 type;
-#     __u16 code;
-#     __s32 value;
-# }
+#  # sys/time.h bits/types/struct_timeval.h bits/types.h bits/typesizes.h
+#  struct timeval time; # long int, long int
+#  __u16 type;
+#  __u16 code;
+#  __s32 value;
 #
 ## linux x86_64 (LP64): long 8, long 8, ushort 2, ushort 2, int 4 == 24 bytes
 # $ cc -xc - << %; ./a.out
