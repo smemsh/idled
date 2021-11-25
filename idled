@@ -53,7 +53,7 @@ class Evtype(Enum):
 # mouse and keyboard event queue inserted by input device monitor threads
 evq = SimpleQueue()
 
-# one queue for keyboard and mouse events, inserted as (Qtype, count) tuples
+# one queue for kbd+mouse events, inserted as (Qtype, timestamp, count) tuples
 class Qtype(IntEnum):
     QT_KEY = 0
     QT_MOUSE = 1
