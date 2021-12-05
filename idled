@@ -170,7 +170,9 @@ def queue_events(fd):
                 if code == 3: # SYN_DROPPED
                     bomb("got SYN_DROPPED, handle this case!")
             else:
+                # EV_REL or EV_ABS are the only ones left, both mouse events
                 mevs += 1
+
             processed += 1
 
         if t is not Evtype.EV_SYN:
