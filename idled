@@ -196,9 +196,9 @@ def queue_events(fd):
 
 def process_events():
 
-    # precreate fixed-length (given by unidle number for each input
-    # type) list of recent event timestamps, and prime all entries with
-    # the start time.  we'll keep an index to the current timestamp
+    # precreate fixed-length (by unidle number for each input type) list
+    # of recent event timestamps, all entries primed with start time
+    # less the idle interval.  we keep an index to the current timestamp
     # entry for writing each event as we receive it, and make it
     # circular by incrementing, modulo list length, each iteration
     #
@@ -206,7 +206,8 @@ def process_events():
     events = [[]] * qtypen
     for qt in Qtype:
         v = qt.value
-        events[v] = [nowtime()] * unidle_n[v]
+        primetime = nowtime() - unidle_s[v]
+        events[v] = [primetime] * unidle_n[v]
 
     while True:
 
