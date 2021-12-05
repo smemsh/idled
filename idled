@@ -55,7 +55,7 @@ class Evtype(Enum):
 # mouse and keyboard event queue inserted by input device monitor threads
 evq = SimpleQueue()
 
-# one queue for kbd+mouse events, inserted as (Qtype, timestamp, count) tuples
+# one queue for kbd+mouse events, inserted as (Qtype, timestamp) tuples
 class Qtype(IntEnum):
     QT_KEY = 0
     QT_MOUSE = 1
@@ -188,8 +188,10 @@ def queue_events(fd):
         if kevs and mevs:
             bomb("received both key and mouse events at once")
 
-        if kevs: evq.put((Qtype.QT_KEY, timetime, kevs))
-        else: evq.put((Qtype.QT_MOUSE, timetime, kevs))
+        # note: we dont queue count because they all have same timestamp
+        # for each set of EV_SYN delimited events, so we count batches
+        if kevs: evq.put((Qtype.QT_KEY, timetime))
+        else: evq.put((Qtype.QT_MOUSE, timetime))
 
 
 def process_events():
@@ -209,7 +211,7 @@ def process_events():
     while True:
 
         # block until an event is read on any of the input devices
-        qtype, timetime, count = evq.get()
+        qtype, timetime = evq.get()
 
         # oldest entry, at oldidx, will always be the slot after newest
         # (current event) index, which is the same as the maximally
@@ -218,28 +220,12 @@ def process_events():
         # than unidle_s secs have elapsed, which means we're no longer
         # idle
         #
-        for _ in range(count):
-            #
-            # we have to repeat this count times for multiple event
-            # input batches like we receive from mouse.  in fact this
-            # isn't fair because we only have a "mouse" and "keyboard"
-            # unidle_n, but touchpad events are quite a bit more
-            # voluminous than mouse events.  the only way around this is
-            # to either (1) have a separate queue for touchpad vs mouse,
-            # or (2) ignore the count (don't even add it to the queue)
-            # and and treat each "batch" as one significant event for a
-            # given qtype.  this might actually be the best idea.  we'd
-            # end up counting EV_SYNs, which are roughly equivalent
-            # between mouse and touchpad.  all events in an
-            # EV_SYN-demarcated batch appear to have the same timestamp
-            # anyways TODO
-            #
-            events[qtype][index[qtype]] = timetime
-            idxoldest = (index[qtype] + 1) % unidle_n[qtype]
-            timeoldest = events[qtype][idxoldest]
-            if (timetime - timeoldest) < unidle_s[qtype]:
-                print("would unidled")
-            index[qtype] = idxoldest
+        events[qtype][index[qtype]] = timetime
+        idxoldest = (index[qtype] + 1) % unidle_n[qtype]
+        timeoldest = events[qtype][idxoldest]
+        if (timetime - timeoldest) < unidle_s[qtype]:
+            print("would unidled")
+        index[qtype] = idxoldest
 
 
 # spawn threads to block on input events and queue the ones we care
