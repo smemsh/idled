@@ -69,7 +69,7 @@ unidle_s[Qtype.QT_KEY] = 10
 unidle_n[Qtype.QT_MOUSE] = 60
 unidle_s[Qtype.QT_MOUSE] = 7
 
-# global current idle state, script maintains while it runs
+# track global logical idle state
 idle = True
 
 #
