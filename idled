@@ -167,7 +167,8 @@ def queue_events(fd):
                     else:
                         syns += 1
                         continue
-                # don't care about SYN_DROPPED: unlikely, and safe to ignore
+                if code == 3: # SYN_DROPPED
+                    bomb("got SYN_DROPPED, handle this case!")
             else:
                 mevs += 1
             processed += 1
