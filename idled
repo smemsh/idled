@@ -132,10 +132,7 @@ def get_event_paths():
 # get a batch of event packets from given input device fd and update
 # counters.  we should always get a multiple of EVSIZE from the read(),
 # and each set of batched EVSIZE events will always terminate with an
-# EV_SYN event.  in testing, each read() got exactly one set of related
-# events (ie, only one EV_SYN was present in the read buffer, and it was
-# always the last input_event), but we don't know for sure if multiple
-# event sets can come from a single read()
+# EV_SYN event.
 #
 def queue_events(fd):
 
@@ -143,6 +140,7 @@ def queue_events(fd):
 
         seen = processed = 0
         kevs = mevs = 0
+        syns = 0
 
         try: evbuf = read(fd, EVBUFSZ)
         except Exception as e: err(f"exception: {e}"); raise
@@ -159,9 +157,17 @@ def queue_events(fd):
                 if code <= 255 and val == 1: # ignore buttons and key releases
                     kevs += 1
             elif t is Evtype.EV_SYN:
-                # we don't care to count batches, only events.  we don't
-                # care about SYN_DROPPED either: unlikely, and safe to ignore
-                continue
+                if code == 0:
+                    # SYN_REPORT
+                    # in testing, each read() got only one EV_SYN, and it was
+                    # always the last input_event, but we don't know for sure
+                    # if multiple input event sets can come from one read()
+                    if syns:
+                        bomb("saw a second syn packet in read buffer")
+                    else:
+                        syns += 1
+                        continue
+                # don't care about SYN_DROPPED: unlikely, and safe to ignore
             else:
                 mevs += 1
             processed += 1
