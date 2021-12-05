@@ -248,7 +248,7 @@ async def monitor_events(fds):
     await wait(tasks, return_when=FIRST_EXCEPTION)
 
     # even though an excepting thread won't print exception, it will
-    # return here so at least we'll know an excpetion occurred
+    # return here so at least we'll know an exception occurred
     #
     bomb("monitor thread exception")
 
