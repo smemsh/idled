@@ -10,7 +10,7 @@ from glob import glob
 from copy import copy
 from enum import Enum, IntEnum
 from time import time as nowtime
-from queue import SimpleQueue
+from queue import SimpleQueue, Empty
 from struct import calcsize, iter_unpack
 from signal import SIGTERM
 from asyncio import to_thread, create_task, wait, run, FIRST_EXCEPTION
@@ -68,6 +68,9 @@ unidle_n[Qtype.QT_KEY] = 3
 unidle_s[Qtype.QT_KEY] = 10
 unidle_n[Qtype.QT_MOUSE] = 60
 unidle_s[Qtype.QT_MOUSE] = 7
+
+# when unidle, this many seconds without an event will go afk
+afksecs = 15
 
 # track global logical idle state
 idle = True
@@ -196,6 +199,8 @@ def queue_events(fd):
 
 def process_events():
 
+    global idle
+
     # precreate fixed-length (by unidle number for each input type) list
     # of recent event timestamps, all entries primed with start time
     # less the idle interval.  we keep an index to the current timestamp
@@ -211,8 +216,10 @@ def process_events():
 
     while True:
 
-        # block until an event is read on any of the input devices
-        qtype, timetime = evq.get()
+        # wait for input event indefinitely if idle or until timeout if not
+        timeout = afksecs if not idle else None
+        try: qtype, timetime = evq.get(timeout=timeout)
+        except Empty: print("would go afk"); continue
 
         # oldest entry, at oldidx, will always be the slot after newest
         # (current event) index, which is the same as the maximally
@@ -223,7 +230,7 @@ def process_events():
         events[qtype][index[qtype]] = timetime
         idxoldest = (index[qtype] + 1) % unidle_n[qtype]
         timeoldest = events[qtype][idxoldest]
-        if (timetime - timeoldest) < unidle_s[qtype]:
+        if idle and (timetime - timeoldest) < unidle_s[qtype]:
             print("would unidled")
         index[qtype] = idxoldest
 
