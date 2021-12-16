@@ -70,7 +70,7 @@ unidle_n[Qtype.QT_MOUSE] = 60
 unidle_s[Qtype.QT_MOUSE] = 7
 
 # when unidle, this many seconds without an event will go afk
-afksecs = 15
+afksecs = 30
 
 # track global logical idle state
 idle = True
