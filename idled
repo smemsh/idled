@@ -165,8 +165,17 @@ def queue_events(fd):
                     # in testing, each read() got only one EV_SYN, and it was
                     # always the last input_event, but we don't know for sure
                     # if multiple input event sets can come from one read()
+                    # update: we sometimes see a second EV_SYN so we
+                    # need to gather more information about this
                     if syns:
-                        bomb("saw a second syn packet in read buffer")
+                        t = secs + usecs / 1000000.0 # todo dupe
+                        dprint("second syn: "
+                               f"fd{fd}: "
+                               f"type:{itype}, "
+                               f"code:{code}, "
+                               f"value:{val}, "
+                               f"t:{timetime}, "
+                               "")
                     else:
                         syns += 1
                         continue
@@ -179,7 +188,7 @@ def queue_events(fd):
             processed += 1
 
         if t is not Evtype.EV_SYN:
-            bomb(f"fd {fd}: sync packet not last!")
+            err(f"fd {fd}: sync packet not last, got {t} instead!")
 
         if debug:
             dprint(f"fd{fd}: saw {seen}, processed {processed}, "
