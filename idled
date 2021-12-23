@@ -161,26 +161,9 @@ def queue_events(fd):
                     kevs += 1
             elif t is Evtype.EV_SYN:
                 if code == 0:
-                    # SYN_REPORT
-                    # in testing, each read() got only one EV_SYN, and it was
-                    # always the last input_event, but we don't know for sure
-                    # if multiple input event sets can come from one read()
-                    # update: we sometimes see a second EV_SYN so we
-                    # need to gather more information about this
-                    prevstamp = stamp
-                    stamp = secs + usecs / 1000000.0 # todo dupe
-                    if syns:
-                        err("second syn: "
-                            f"fd{fd}: "
-                            f"type:{itype}, "
-                            f"code:{code}, "
-                            f"value:{val}, "
-                            f"stamp:{stamp}, "
-                            f"prev:{prevstamp}, "
-                            "")
-                    else:
-                        syns += 1
-                        continue
+                    # SYN_REPORT sometimes see a second one, should handle ok
+                    if syns: dprint(f"syn2: fd{fd}: type:{itype}, code:{code}")
+                    else: syns += 1; continue
                 if code == 3: # shouldn't happen in practice
                     err("got SYN_DROPPED, handle this case!")
             else:
