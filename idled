@@ -133,9 +133,7 @@ def get_event_paths():
     return paths
 
 # get a batch of event packets from given input device fd and update
-# counters.  we should always get a multiple of EVSIZE from the read(),
-# and each set of batched EVSIZE events will always terminate with an
-# EV_SYN event.
+# counters.  we should always get a multiple of EVSIZE from the read()
 #
 def queue_events(fd):
 
@@ -189,6 +187,15 @@ def queue_events(fd):
                 # EV_REL or EV_ABS are the only ones left, both mouse events
                 mevs += 1
 
+            # struct timeval fields to time.time() float
+            timetime = secs + usecs / 1000000.0 # todo dupe
+
+            if kevs and mevs:
+                err("received both key and mouse events at once")
+
+            if kevs: evq.put((Qtype.QT_KEY, timetime))
+            if mevs: evq.put((Qtype.QT_MOUSE, timetime))
+
             processed += 1
 
         if t is not Evtype.EV_SYN:
@@ -198,16 +205,6 @@ def queue_events(fd):
             dprint(f"fd{fd}: saw {seen}, processed {processed}, "
                    f"key {kevs}, mouse {mevs}")
 
-        # struct timeval fields to time.time() float
-        timetime = secs + usecs / 1000000.0 # todo dupe
-
-        if kevs and mevs:
-            bomb("received both key and mouse events at once")
-
-        # note: we dont queue count because they all have same timestamp
-        # for each set of EV_SYN delimited events, so we count batches
-        if kevs: evq.put((Qtype.QT_KEY, timetime))
-        else: evq.put((Qtype.QT_MOUSE, timetime))
 
 
 def process_events():
