@@ -168,19 +168,18 @@ def queue_events(fd):
                     # update: we sometimes see a second EV_SYN so we
                     # need to gather more information about this
                     if syns:
-                        t = secs + usecs / 1000000.0 # todo dupe
-                        dprint("second syn: "
-                               f"fd{fd}: "
-                               f"type:{itype}, "
-                               f"code:{code}, "
-                               f"value:{val}, "
-                               f"t:{timetime}, "
-                               "")
+                        err("second syn: "
+                            f"fd{fd}: "
+                            f"type:{itype}, "
+                            f"code:{code}, "
+                            f"value:{val}, "
+                            f"t:{timetime}, "
+                            "")
                     else:
                         syns += 1
                         continue
                 if code == 3: # shouldn't happen in practice
-                    bomb("got SYN_DROPPED, handle this case!")
+                    err("got SYN_DROPPED, handle this case!")
             else:
                 # EV_REL or EV_ABS are the only ones left, both mouse events
                 mevs += 1
