@@ -212,8 +212,6 @@ def queue_events(fd):
 
 def process_events():
 
-    global idle
-
     # precreate fixed-length (by unidle number for each input type) list
     # of recent event timestamps, all entries primed with start time
     # less the idle interval.  we keep an index to the current timestamp
