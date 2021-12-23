@@ -145,6 +145,8 @@ def queue_events(fd):
         kevs = mevs = 0
         syns = 0
 
+        stamp = 0.0
+
         try: evbuf = read(fd, EVBUFSZ)
         except Exception as e: err(f"exception: {e}"); raise
 
@@ -167,13 +169,16 @@ def queue_events(fd):
                     # if multiple input event sets can come from one read()
                     # update: we sometimes see a second EV_SYN so we
                     # need to gather more information about this
+                    prevstamp = stamp
+                    stamp = secs + usecs / 1000000.0 # todo dupe
                     if syns:
                         err("second syn: "
                             f"fd{fd}: "
                             f"type:{itype}, "
                             f"code:{code}, "
                             f"value:{val}, "
-                            f"t:{timetime}, "
+                            f"stamp:{stamp}, "
+                            f"prev:{prevstamp}, "
                             "")
                     else:
                         syns += 1
@@ -194,7 +199,7 @@ def queue_events(fd):
                    f"key {kevs}, mouse {mevs}")
 
         # struct timeval fields to time.time() float
-        timetime = secs + usecs / 1000000.0
+        timetime = secs + usecs / 1000000.0 # todo dupe
 
         if kevs and mevs:
             bomb("received both key and mouse events at once")
