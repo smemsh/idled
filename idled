@@ -25,6 +25,9 @@ from os import (
     EX_SOFTWARE as EXIT_FAILURE,
 )
 
+#
+from yaml import safe_load as yloads
+
 ## /usr/include/linux/input.h:
 # struct input_event
 #  # sys/time.h bits/types/struct_timeval.h bits/types.h bits/typesizes.h
@@ -64,13 +67,10 @@ qtypen = len(list(Qtype))
 # idle flag will drop if N events of type Qtype in S seconds
 unidle_n = [0] * qtypen
 unidle_s = copy(unidle_n)
-unidle_n[Qtype.QT_KEY] = 3
-unidle_s[Qtype.QT_KEY] = 10
-unidle_n[Qtype.QT_MOUSE] = 60
-unidle_s[Qtype.QT_MOUSE] = 7
-
-# when unidle, this many seconds without an event will go afk
-afksecs = 30
+unidle_n[Qtype.QT_KEY] = 0
+unidle_s[Qtype.QT_KEY] = 0
+unidle_n[Qtype.QT_MOUSE] = 0
+unidle_s[Qtype.QT_MOUSE] = 0
 
 # track global logical idle state
 idle = True
@@ -119,6 +119,27 @@ def process_args():
     addflag (p, 'd', 'debug')
 
     args = p.parse_args(args)
+
+
+def process_rcfile():
+
+    global rc
+    global unidle_n
+    global unidle_s
+
+    # rcfile vars are stored as attributes
+    class RunControl: pass
+    rcobj = RunControl()
+
+    rcfilename = getenv('IDLERC', "%s/.idlerc" % getenv('HOME'))
+    with open(rcfilename) as rcfile: rc = yloads(rcfile)
+    for k, v in rc.items(): setattr(rcobj, k, v)
+    rc = rcobj
+
+    unidle_n[Qtype.QT_KEY] = rc.unidle_keyboard_count
+    unidle_s[Qtype.QT_KEY] = rc.unidle_keyboard_secs
+    unidle_n[Qtype.QT_MOUSE] = rc.unidle_mouse_count
+    unidle_s[Qtype.QT_MOUSE] = rc.unidle_mouse_secs
 
 
 def check_sanity():
@@ -208,7 +229,7 @@ def process_events():
     while True:
 
         # wait for input event indefinitely if idle or until timeout if not
-        timeout = afksecs if not idle else None
+        timeout = rc.afksecs if not idle else None
         try: qtype, timetime = evq.get(timeout=timeout)
         except Empty: afk(nowtime()); continue
 
@@ -285,6 +306,7 @@ def main():
     if debug == 1:
         breakpoint()
 
+    process_rcfile()
     process_args()
     check_sanity()
 
