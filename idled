@@ -289,15 +289,18 @@ def idled():
 def timetimefmt(timetime):
     return strftime("%Y%m%d%H%M%S", localtime(timetime))
 
-def afk(timetime):
+def _idle(timetime, func):
     global idle
-    idle = True
-    print(f"{timetimefmt(timetime)}: idle")
+    global lastchange
+    invname = func.__name__
+    idle = True if invname == 'afk' else False
+    print(f"{timetimefmt(timetime)}: {invname:7s}")
+
+def afk(timetime):
+    _idle(timetime, afk)
 
 def unidle(timetime):
-    global idle
-    idle = False
-    print(f"{timetimefmt(timetime)}: unidle")
+    _idle(timetime, unidle)
 
 ###
 
