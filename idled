@@ -5,6 +5,7 @@ __url__     = 'https://github.com/smemsh/idled'
 __author__  = 'Scott Mcdermott <scott@smemsh.net>'
 __license__ = 'GPL-2.0'
 
+from re import sub
 from sys import argv, stderr, exit
 from glob import glob
 from copy import copy
@@ -14,6 +15,7 @@ from queue import SimpleQueue, Empty
 from struct import calcsize, iter_unpack
 from signal import SIGTERM
 from asyncio import to_thread, create_task, wait, run, FIRST_EXCEPTION
+from datetime import timedelta
 from argparse import ArgumentParser, RawTextHelpFormatter
 from subprocess import check_output
 
@@ -74,6 +76,9 @@ unidle_s[Qtype.QT_MOUSE] = 0
 
 # track global logical idle state
 idle = True
+
+# keep track of last change to idle to calc interval time
+lastchange = nowtime()
 
 #
 
@@ -289,12 +294,19 @@ def idled():
 def timetimefmt(timetime):
     return strftime("%Y%m%d%H%M%S", localtime(timetime))
 
+def timetimehms(secs):
+    return sub('\.\d+$', '', str(timedelta(seconds=secs)))
+
 def _idle(timetime, func):
     global idle
     global lastchange
+    now = nowtime()
     invname = func.__name__
     idle = True if invname == 'afk' else False
-    print(f"{timetimefmt(timetime)}: {invname:7s}")
+    elapsed = now - lastchange
+    print(f"{timetimefmt(timetime)}: {invname:7s} "
+          f"{timetimehms(elapsed):>7s} ")
+    lastchange = now
 
 def afk(timetime):
     _idle(timetime, afk)
