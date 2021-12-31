@@ -13,6 +13,7 @@ from enum import Enum, IntEnum
 from time import strftime, localtime, time as nowtime
 from queue import SimpleQueue, Empty
 from struct import calcsize, iter_unpack
+from socket import error as sockerr
 from signal import SIGTERM
 from asyncio import to_thread, create_task, wait, run, FIRST_EXCEPTION
 from datetime import timedelta
@@ -172,6 +173,7 @@ def queue_events(fd):
         stamp = 0.0
 
         try: evbuf = read(fd, EVBUFSZ)
+        except sockerr as serr: err(f"socket errno: {serr.errno}"); raise
         except Exception as e: err(f"exception: {e}"); raise
 
         for event in iter_unpack(EVFMT, evbuf):
