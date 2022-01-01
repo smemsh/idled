@@ -266,10 +266,11 @@ def process_events():
 async def monitor_events(fds):
 
     tasks = []
-    for fd in fds:
-        tasks.append(create_task(to_thread(queue_events, fd)))
+    def mktask(*args):
+        tasks.append(create_task(to_thread(*args)))
 
-    tasks.append(create_task(to_thread(process_events)))
+    for fd in fds: mktask(queue_events, fd)
+    mktask(process_events)
 
     await wait(tasks, return_when=FIRST_EXCEPTION)
 
