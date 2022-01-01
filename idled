@@ -30,6 +30,7 @@ from os import (
 
 #
 from yaml import safe_load as yloads
+from inotify.adapters import Inotify
 
 ## /usr/include/linux/input.h:
 # struct input_event
@@ -173,8 +174,11 @@ def queue_events(fd):
         stamp = 0.0
 
         try: evbuf = read(fd, EVBUFSZ)
-        except sockerr as serr: err(f"socket errno: {serr.errno}"); raise
-        except Exception as e: err(f"exception: {e}"); raise
+        except sockerr as serr:
+            # serr: [Errno 19] No such device
+            err(f"socket errno: {serr.errno}"); raise
+        except Exception as e:
+            err(f"queue exception: {e}"); raise
 
         for event in iter_unpack(EVFMT, evbuf):
             secs, usecs, itype, code, val = event
@@ -217,7 +221,6 @@ def queue_events(fd):
                    f"key {kevs}, mouse {mevs}")
 
 
-
 def process_events():
 
     # precreate fixed-length (by unidle number for each input type) list
@@ -254,6 +257,20 @@ def process_events():
         index[qtype] = idxoldest
 
 
+def watch_devices():
+    try:
+        #i = Inotify(block_duration_s=2<<20) # ~forever
+        i = Inotify()
+        i.add_watch("/dev/input/by-path")
+        while True:
+            for event in i.event_gen(yield_nones=False):
+                _, evtypes, _, filename = event
+                if set(evtypes).intersection(['IN_CREATE', 'IN_DELETE']):
+                    print(f"would restart")
+    except Exception as e:
+        print(f"watch devices exception: {e}")
+
+
 # spawn threads to block on input events and queue the ones we care
 # about.  then we have another thread that blocks on queue.get() and
 # processes the events.  note: to_thread() uses ThreadPoolExecutor which
@@ -271,6 +288,7 @@ async def monitor_events(fds):
 
     for fd in fds: mktask(queue_events, fd)
     mktask(process_events)
+    mktask(watch_devices)
 
     await wait(tasks, return_when=FIRST_EXCEPTION)
 
