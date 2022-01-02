@@ -5,7 +5,7 @@ __url__     = 'https://github.com/smemsh/idled'
 __author__  = 'Scott Mcdermott <scott@smemsh.net>'
 __license__ = 'GPL-2.0'
 
-from re import sub
+from re import sub, search
 from sys import argv, stderr, exit
 from glob import glob
 from copy import copy
@@ -160,6 +160,9 @@ def get_event_paths():
         paths[suffix] = glob(f"/dev/input/by-path/*-event-{suffix}")
     return paths
 
+def is_event_file(fname):
+    return bool(search("-event-(kbd|mouse)$", fname))
+
 # get a batch of event packets from given input device fd and update
 # counters.  we should always get a multiple of EVSIZE from the read()
 #
@@ -266,7 +269,8 @@ def watch_devices():
             for event in i.event_gen(yield_nones=False):
                 _, evtypes, _, filename = event
                 if set(evtypes).intersection(['IN_CREATE', 'IN_DELETE']):
-                    print(f"would restart")
+                    if is_event_file(filename):
+                        print(f"input dev change: {filename}, restarting")
     except Exception as e:
         print(f"watch devices exception: {e}")
 
