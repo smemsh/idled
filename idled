@@ -331,8 +331,9 @@ def _idle(timetime, func):
     invname = func.__name__
     idle = True if invname == 'afk' else False
     elapsed = now - lastchange
-    print(f"{timetimefmt(timetime)}: {invname:7s} "
-          f"{timetimehms(elapsed):>7s} ")
+    stamp = timetimefmt(timetime)
+    since = timetimehms(elapsed)
+    print(f"{stamp}: {invname:7s} {since:>7s}")
     lastchange = now
 
 def afk(timetime):
