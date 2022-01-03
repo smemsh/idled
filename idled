@@ -272,7 +272,7 @@ def watch_devices():
                 _, evtypes, _, filename = event
                 if set(evtypes).intersection(['IN_CREATE', 'IN_DELETE']):
                     if is_event_file(filename):
-                        print(f"input dev change: {filename}, restarting")
+                        restart(filename)
     except Exception as e:
         print(f"watch devices exception: {e}")
 
@@ -317,6 +317,7 @@ def idled():
 
     exit(EXIT_SUCCESS)
 
+#
 
 def timetimefmt(timetime):
     return strftime("%Y%m%d%H%M%S", localtime(timetime))
@@ -341,6 +342,12 @@ def afk(timetime):
 
 def unidle(timetime):
     _idle(timetime, unidle)
+
+#
+
+def restart(reason):
+    stamp = timetimefmt(nowtime())
+    print(f"{stamp}: restart {reason}")
 
 ###
 
