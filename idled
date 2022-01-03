@@ -11,9 +11,9 @@ from glob import glob
 from copy import copy
 from enum import Enum, IntEnum
 from time import strftime, localtime, time as nowtime
+from errno import ENODEV
 from queue import SimpleQueue, Empty
 from struct import calcsize, iter_unpack
-from socket import error as sockerr
 from signal import SIGTERM
 from asyncio import to_thread, create_task, wait, run, FIRST_EXCEPTION
 from datetime import timedelta
@@ -177,9 +177,11 @@ def queue_events(fd):
         stamp = 0.0
 
         try: evbuf = read(fd, EVBUFSZ)
-        except sockerr as serr:
-            # serr: [Errno 19] No such device
-            err(f"socket errno: {serr.errno}"); raise
+        except OSError as e:
+            if e.errno == ENODEV:
+                err(f"device at fd {fd} disappeared")
+                # restart()
+            raise
         except Exception as e:
             err(f"queue exception: {e}"); raise
 
