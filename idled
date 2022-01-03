@@ -333,7 +333,7 @@ def _idle(timetime, func):
     elapsed = now - lastchange
     stamp = timetimefmt(timetime)
     since = timetimehms(elapsed)
-    print(f"{stamp}: {since:>7s} {invname:7s}")
+    print(f"{stamp}: {since:>9s} {invname:7s}")
     lastchange = now
 
 def afk(timetime):
