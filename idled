@@ -208,7 +208,7 @@ def queue_events(fd):
                 mevs += 1
 
             # struct timeval fields to time.time() float
-            timetime = secs + usecs / 1000000.0 # todo dupe
+            timetime = secs + usecs / 1000000.0
 
             if kevs and mevs:
                 err("received both key and mouse events at once")
