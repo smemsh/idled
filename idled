@@ -79,7 +79,7 @@ unidle_s[Qtype.QT_MOUSE] = 0
 # track global logical idle state
 idle = True
 
-# keep track of last change to idle to calc interval time
+# keep track of last time idle changed state to calculate interval
 lastchange = nowtime()
 
 #
