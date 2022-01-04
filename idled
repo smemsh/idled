@@ -99,7 +99,7 @@ def dprint(*args, **kwargs):
 
 def dprintvar(name, vars):
     if not debug: return
-    err(f"debug: {name}")
+    err('debug:', name)
     pp(vars[name])
 
 def exe(cmd):
