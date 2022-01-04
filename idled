@@ -285,7 +285,7 @@ def watch_devices():
                     if is_event_file(filename):
                         restart(filename)
     except Exception as e:
-        print(f"watch devices exception: {e}")
+        err(f"watch devices exception: {e}")
 
 
 # spawn threads to block on input events and queue the ones we care
