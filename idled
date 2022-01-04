@@ -244,7 +244,7 @@ def process_events():
     while True:
 
         # wait for input event indefinitely if idle or until timeout if not
-        timeout = rc.afksecs if not idle else None
+        timeout = rc.idle_secs if not idle else None
         try: qtype, timetime = evq.get(timeout=timeout)
         except Empty: afk(nowtime()); continue
 

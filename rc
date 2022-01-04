@@ -6,4 +6,4 @@ unidle_keyboard_secs: 10
 unidle_mouse_count: 60
 unidle_mouse_secs: 7
 
-afksecs: 30
+idle_secs: 30
