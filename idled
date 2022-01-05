@@ -158,7 +158,7 @@ def restart(reason):
 
     global exclusive
     exclusive.acquire()
-    stamp = timetimefmt(nowtime())
+    stamp = timetimefmt()
     print(f"{stamp}: restart {reason}, {rc.restart_secs}s")
     sleep(rc.restart_secs) # allow input device change events to batch
     raise_signal(SIGHUP)
@@ -330,13 +330,16 @@ def idled():
 
     exit(EXIT_SUCCESS)
 
-#
+###
 
-def timetimefmt(timetime):
+def timetimefmt(timetime=None):
+    if not timetime: timetime = nowtime()
     return strftime("%Y%m%d%H%M%S", localtime(timetime))
 
 def timetimehms(secs):
     return sub('\.\d+$', '', str(timedelta(seconds=secs)))
+
+#
 
 def _idle(timetime, func):
     global idle
