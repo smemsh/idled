@@ -321,7 +321,7 @@ def idled():
     paths = sum(get_event_paths().values(), [])
     dprintvar('paths', vars())
 
-    signal(SIGHUP, handle_hup)
+    signal(SIGHUP, hangup)
 
     fds = [osopen(path, O_RDONLY) for path in paths]
     try: run(monitor_events(fds))
@@ -358,7 +358,7 @@ def unidle(timetime):
 
 #
 
-def handle_hup(*_):
+def hangup(*_):
     err(f"{timetimefmt(nowtime())}: hangup")
     try: execv(invpath, argv)
     except Exception as e: err(e); raise
