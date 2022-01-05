@@ -107,6 +107,9 @@ def exe(cmd):
 
 ###
 
+def check_sanity():
+    pass
+
 def process_args():
 
     global args
@@ -151,8 +154,14 @@ def process_rcfile():
     unidle_s[Qtype.QT_MOUSE] = rc.unidle_mouse_secs
 
 
-def check_sanity():
-    pass
+def restart(reason):
+
+    global exclusive
+    exclusive.acquire()
+    stamp = timetimefmt(nowtime())
+    print(f"{stamp}: restart {reason}, {rc.restart_secs}s")
+    sleep(rc.restart_secs) # allow input device change events to batch
+    raise_signal(SIGHUP)
 
 ###
 
@@ -291,6 +300,7 @@ def watch_devices():
 async def monitor_events(fds):
 
     tasks = []
+
     def mktask(*args):
         tasks.append(create_task(to_thread(*args)))
 
@@ -305,10 +315,6 @@ async def monitor_events(fds):
     #
     bomb("monitor thread exception")
 
-def handle_hup(*_):
-    err(f"{timetimefmt(nowtime())}: hangup")
-    try: execv(invpath, argv)
-    except Exception as e: err(e); raise
 
 def idled():
 
@@ -352,13 +358,10 @@ def unidle(timetime):
 
 #
 
-def restart(reason):
-    global exclusive
-    exclusive.acquire()
-    stamp = timetimefmt(nowtime())
-    print(f"{stamp}: restart {reason}, {rc.restart_secs}s")
-    sleep(rc.restart_secs) # allow input device change events to batch
-    raise_signal(SIGHUP)
+def handle_hup(*_):
+    err(f"{timetimefmt(nowtime())}: hangup")
+    try: execv(invpath, argv)
+    except Exception as e: err(e); raise
 
 ###
 
