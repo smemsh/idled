@@ -7,3 +7,5 @@ unidle_mouse_count: 60
 unidle_mouse_secs: 7
 
 idle_secs: 30
+
+restart_secs: 3
