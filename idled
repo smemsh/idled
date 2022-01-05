@@ -190,7 +190,7 @@ def queue_events(fd):
         try: evbuf = read(fd, EVBUFSZ)
         except OSError as e:
             if e.errno == ENODEV:
-                err(f"device at fd {fd} disappeared")
+                err(f"device at fd {fd} disappeared, restarting")
                 # restart()
             raise
         except Exception as e:
@@ -360,7 +360,7 @@ def unidle(timetime):
 
 def hangup(*_):
     err(f"{timetimefmt(nowtime())}: hangup")
-    try: execv(invpath, argv)
+    try: execv(invpath, argv) # O_CLOEXEC default since py3.4
     except Exception as e: err(e); raise
 
 ###
