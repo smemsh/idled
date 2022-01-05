@@ -86,8 +86,11 @@ lastchange = nowtime()
 # for places we need first use to block successors, eg restart()
 exclusive = Lock()
 
+def log(*args, **kwargs):
+    print(*args, **kwargs)
+
 def err(*args, **kwargs):
-    print(*args, file=stderr, **kwargs)
+    log(*args, file=stderr, **kwargs)
 
 def bomb(*args):
     err(*args)
@@ -350,7 +353,7 @@ def _idle(timetime, func):
     elapsed = now - lastchange
     stamp = timetimefmt(timetime)
     since = timetimehms(elapsed)
-    print(f"{stamp}: {since:>9s} {invname:7s}")
+    log(f"{stamp} {since:>9s} {invname:7s}")
     lastchange = now
 
 def afk(timetime):
