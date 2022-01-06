@@ -164,8 +164,7 @@ def restart(reason):
 
     global exclusive
     exclusive.acquire()
-    stamp = timetimefmt()
-    print(f"{stamp}: restart {reason}, {rc.restart_secs}s")
+    errnow(f"restart in {rc.restart_secs}s, reason: {reason}")
     sleep(rc.restart_secs) # allow input device change events to batch
     raise_signal(SIGHUP)
 
@@ -368,7 +367,7 @@ def unidle(timetime):
 #
 
 def hangup(*_):
-    err(f"{timetimefmt(nowtime())}: hangup")
+    errnow("hangup")
     try: execv(invpath, argv) # O_CLOEXEC default since py3.4
     except Exception as e: err(e); raise
 
