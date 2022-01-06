@@ -92,6 +92,9 @@ def log(*args, **kwargs):
 def err(*args, **kwargs):
     log(*args, file=stderr, **kwargs)
 
+def errnow(*args, **kwargs):
+    err(f"{timetimefmt()}", *args, **kwargs)
+
 def bomb(*args):
     err(*args)
     exit(EXIT_FAILURE)
