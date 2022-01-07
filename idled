@@ -312,6 +312,7 @@ async def monitor_events(fds):
     for fd in fds: mktask(queue_events, fd)
     mktask(process_events)
     mktask(watch_devices)
+    errnow(f"monitoring {len(fds)} inputs")
 
     await wait(tasks, return_when=FIRST_EXCEPTION)
 
