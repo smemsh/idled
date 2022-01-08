@@ -14,7 +14,7 @@ from time import strftime, sleep, localtime, time as nowtime
 from errno import ENODEV
 from queue import SimpleQueue, Empty
 from struct import calcsize, iter_unpack
-from signal import SIGTERM, SIGHUP, raise_signal, signal
+from signal import SIGTERM, SIGHUP, signal
 from asyncio import to_thread, create_task, wait, run, FIRST_EXCEPTION
 from datetime import timedelta
 from argparse import ArgumentParser, RawTextHelpFormatter
@@ -23,7 +23,7 @@ from subprocess import check_output
 
 from os.path import basename, realpath
 from os import (
-    getenv, chdir, read, killpg, getpgid, execv,
+    getenv, chdir, read, kill, killpg, getpid, getpgid, execv,
     open as osopen, O_RDONLY,
     EX_OK as EXIT_SUCCESS,
     EX_SOFTWARE as EXIT_FAILURE,
@@ -166,7 +166,7 @@ def restart(reason):
     exclusive.acquire()
     errnow(f"restart in {rc.restart_secs}s, reason: {reason}")
     sleep(rc.restart_secs) # allow input device change events to batch
-    raise_signal(SIGHUP)
+    kill(pid, SIGHUP) # signal.raise_signal() seems not to kill main pid
 
 ###
 
@@ -408,6 +408,7 @@ if __name__ == "__main__":
     invpath = realpath(argv[0])
     invname = basename(argv[0])
     args = argv[1:]
+    pid = getpid()
 
     try: main()
     except BdbQuit: bomb("debug: stop")
