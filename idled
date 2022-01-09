@@ -195,8 +195,7 @@ def queue_events(fd):
         try: evbuf = read(fd, EVBUFSZ)
         except OSError as e:
             if e.errno == ENODEV:
-                err(f"device at fd {fd} disappeared, restarting")
-                # restart()
+                restart(f"fd {fd} disappeared")
             raise
         except Exception as e:
             err(f"queue exception: {e}"); raise
