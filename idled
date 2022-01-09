@@ -167,6 +167,7 @@ def restart(reason):
     errnow(f"restart in {rc.restart_secs}s, reason: {reason}")
     sleep(rc.restart_secs) # allow input device change events to batch
     kill(pid, SIGHUP) # signal.raise_signal() seems not to kill main pid
+    sleep(2<<32) # don't return in this thread before handler has killed us
 
 ###
 
@@ -196,6 +197,7 @@ def queue_events(fd):
         except OSError as e:
             if e.errno == ENODEV:
                 restart(f"fd {fd} disappeared")
+                bomb("restart somehow did not block")
             raise
         except Exception as e:
             err(f"queue exception: {e}"); raise
