@@ -280,9 +280,17 @@ def process_events():
 
 
 def watch_devices():
+
+    # inotify lib default 1s epoll timeout, defeating purpose of using
+    # input events (if we wanted a tick, we might rather just poll
+    # /sys/kernel/irq/N/per_cpu_count).  already doing work in separate
+    # threads so ok to block here as it will yield the processor.
+    # duration 0 busy loops on epoll_wait(2) returning immediately; -1
+    # not accepted; and not supplying duration defaults to 1s
+    #
+    blocktime = 2 << 20
     try:
-        #i = Inotify(block_duration_s=2<<20) # ~forever
-        i = Inotify()
+        i = Inotify(block_duration_s=blocktime)
         i.add_watch("/dev/input/by-path")
         while True:
             for event in i.event_gen(yield_nones=False):
