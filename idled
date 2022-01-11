@@ -316,7 +316,10 @@ async def monitor_events(fds):
     tasks = []
 
     def mktask(*args):
-        tasks.append(create_task(to_thread(*args)))
+        func = args[0]
+        fnname = func.__name__
+        fnhash = f"{fnname}-{hash(func)}"
+        tasks.append(create_task(to_thread(*args), name=fnhash))
 
     for fd in fds: mktask(queue_events, fd)
     mktask(process_events)
