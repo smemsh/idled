@@ -15,10 +15,11 @@ from errno import ENODEV
 from queue import SimpleQueue, Empty
 from struct import calcsize, iter_unpack
 from signal import SIGTERM, SIGHUP, signal
-from asyncio import to_thread, create_task, wait, run, FIRST_EXCEPTION
 from datetime import timedelta
 from argparse import ArgumentParser, RawTextHelpFormatter
 from threading import Lock
+from traceback import format_exception
+from contextlib import suppress
 from subprocess import check_output
 
 from os.path import basename, realpath
@@ -27,6 +28,12 @@ from os import (
     open as osopen, O_RDONLY,
     EX_OK as EXIT_SUCCESS,
     EX_SOFTWARE as EXIT_FAILURE,
+)
+
+from asyncio import (
+    to_thread, create_task, wait, run,
+    FIRST_EXCEPTION,
+    CancelledError,
 )
 
 #
@@ -326,12 +333,26 @@ async def monitor_events(fds):
     mktask(watch_devices)
     errnow(f"monitoring {len(fds)} inputs")
 
-    await wait(tasks, return_when=FIRST_EXCEPTION)
+    done, pending = await wait(tasks, return_when=FIRST_EXCEPTION)
+    ndone, npending = [len(tasks) for tasks in [done, pending]]
+    errnow(f"canceling {npending} after {ndone} finished")
+    for task in pending:
+        # other threads in blocking calls but could except before restart
+        task.cancel()
+        with suppress(CancelledError):
+            await task
 
-    # even though an excepting thread won't print exception, it will
-    # return here so at least we'll know an exception occurred
-    #
-    bomb("monitor thread exception")
+    try:
+        for task in done:
+            n = task.get_name()
+            e = task.exception()
+            trace = ''.join(format_exception(type(e), e, e.__traceback__))
+            errnow(f"done: {n}, exception: {trace}")
+    except Exception as e:
+        print(f"exception at end of monitor: {e}")
+
+    errnow(f"exiting monitor thread")
+    exit(EXIT_FAILURE)
 
 
 def idled():
