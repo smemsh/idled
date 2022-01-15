@@ -263,7 +263,7 @@ def process_events():
     # entry for writing each event as we receive it, and make it
     # circular by incrementing, modulo list length, each iteration
     #
-    index = [0] * qtypen
+    evtidx = [0] * qtypen
     events = [[]] * qtypen
     for qt in Qtype:
         v = qt.value
@@ -282,12 +282,12 @@ def process_events():
         # and compare current event to oldest each loop to see if less
         # than unidle_s secs have elapsed, which means no longer idle
         #
-        events[qtype][index[qtype]] = timetime
-        oldidx = (index[qtype] + 1) % unidle_n[qtype]
+        events[qtype][evtidx[qtype]] = timetime
+        oldidx = (evtidx[qtype] + 1) % unidle_n[qtype]
         timeoldest = events[qtype][oldidx]
         if idle and (timetime - timeoldest) < unidle_s[qtype]:
             unidle(timetime)
-        index[qtype] = oldidx
+        evtidx[qtype] = oldidx
 
 
 def watch_devices():
