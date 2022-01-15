@@ -283,11 +283,11 @@ def process_events():
         # than unidle_s secs have elapsed, which means no longer idle
         #
         events[qtype][index[qtype]] = timetime
-        idxoldest = (index[qtype] + 1) % unidle_n[qtype]
-        timeoldest = events[qtype][idxoldest]
+        oldidx = (index[qtype] + 1) % unidle_n[qtype]
+        timeoldest = events[qtype][oldidx]
         if idle and (timetime - timeoldest) < unidle_s[qtype]:
             unidle(timetime)
-        index[qtype] = idxoldest
+        index[qtype] = oldidx
 
 
 def watch_devices():
