@@ -40,6 +40,8 @@ from asyncio import (
 from yaml import safe_load as yloads
 from inotify.adapters import Inotify
 
+###
+
 ## /usr/include/linux/input.h:
 # struct input_event
 #  # sys/time.h bits/types/struct_timeval.h bits/types.h bits/typesizes.h
@@ -70,11 +72,16 @@ class Evtype(Enum):
 # mouse and keyboard event queue inserted by input device monitor threads
 evq = SimpleQueue()
 
+# for places we need first use to block successors, eg restart()
+exclusive = Lock()
+
 # one queue for kbd+mouse events, inserted as (Qtype, timestamp) tuples
 class Qtype(IntEnum):
     QT_KEY = 0
     QT_MOUSE = 1
 qtypen = len(list(Qtype))
+
+###
 
 # idle flag will drop if N events of type Qtype in S seconds
 unidle_n = [0] * qtypen
@@ -90,8 +97,7 @@ idle = True
 # keep track of last time idle changed state to calculate interval
 lastchange = nowtime()
 
-# for places we need first use to block successors, eg restart()
-exclusive = Lock()
+###
 
 def log(*args, **kwargs):
     print(*args, **kwargs)
