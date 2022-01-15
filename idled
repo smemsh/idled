@@ -137,7 +137,6 @@ def process_args():
         options = list(("-%s --%s" % (flagchar, longopt)).split())
         p.add_argument(*options, action='store_true', help=help, **kwargs)
 
-    # todo: unused
     def addarg(p, vname, vdesc, help=None, /, **kwargs):
         p.add_argument(vname, nargs='?', metavar=vdesc, help=help, **kwargs)
 
@@ -273,7 +272,6 @@ def process_events():
 
     while True:
 
-        # wait for input event indefinitely if idle or until timeout if not
         timeout = rc.idle_secs if not idle else None
         try: qtype, timetime = evq.get(timeout=timeout)
         except Empty: afk(nowtime()); continue
