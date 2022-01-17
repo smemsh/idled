@@ -81,6 +81,8 @@ class Qtype(IntEnum):
     QT_MOUSE = 1
 qtypen = len(list(Qtype))
 
+###
+
 # idle flag will drop if N events of type Qtype in S seconds
 unidle_n = [0] * qtypen
 unidle_s = copy(unidle_n)
@@ -89,12 +91,11 @@ unidle_s[Qtype.QT_KEY] = 0
 unidle_n[Qtype.QT_MOUSE] = 0
 unidle_s[Qtype.QT_MOUSE] = 0
 
-# runtime data for passing to replacement after hangup
-class IdleState:
-    idle = True             # track global logical idle state
-    lastchange = nowtime()  # last time idle changed state
+# track global logical idle state
+idle = True
 
-state = IdleState()
+# keep track of last time idle changed state to calculate interval
+lastchange = nowtime()
 
 ###
 
@@ -271,7 +272,7 @@ def process_events():
 
     while True:
 
-        timeout = rc.idle_secs if not state.idle else None
+        timeout = rc.idle_secs if not idle else None
         try: qtype, timetime = evq.get(timeout=timeout)
         except Empty: afk(nowtime()); continue
 
@@ -284,7 +285,7 @@ def process_events():
         events[qtype][evtidx[qtype]] = timetime
         oldidx = (evtidx[qtype] + 1) % unidle_n[qtype]
         timeoldest = events[qtype][oldidx]
-        if state.idle and (timetime - timeoldest) < unidle_s[qtype]:
+        if idle and (timetime - timeoldest) < unidle_s[qtype]:
             unidle(timetime)
         evtidx[qtype] = oldidx
 
@@ -384,15 +385,16 @@ def timetimehms(secs):
 #
 
 def _idle(timetime, func):
-    global state
+    global idle
+    global lastchange
     now = nowtime()
     invname = func.__name__
-    state.idle = True if invname == 'afk' else False
-    elapsed = now - state.lastchange
+    idle = True if invname == 'afk' else False
+    elapsed = now - lastchange
     stamp = timetimefmt(timetime)
     since = timetimehms(elapsed)
     log(f"{stamp} {since:>9s} {invname:7s}")
-    state.lastchange = now
+    lastchange = now
 
 def afk(timetime):
     _idle(timetime, afk)
