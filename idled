@@ -97,6 +97,9 @@ idle = True
 # keep track of last time idle changed state to calculate interval
 lastchange = nowtime()
 
+# a few different threads need event descriptors
+eventfds = []
+
 ###
 
 def log(*args, **kwargs):
@@ -191,6 +194,12 @@ def get_event_paths():
 
 def is_event_file(fname):
     return bool(search("-event-(kbd|mouse)$", fname))
+
+def open_event_fds():
+    global eventfds
+    paths = sum(get_event_paths().values(), [])
+    dprintvar('paths', vars())
+    eventfds = [osopen(path, O_RDONLY) for path in paths]
 
 # get a batch of event packets from given input device fd and update
 # counters.  we should always get a multiple of EVSIZE from the read()
@@ -322,7 +331,7 @@ def watch_devices():
 #  https://stackoverflow.com/questions/875453
 #  https://stackoverflow.com/questions/49992329
 #
-async def monitor_events(fds):
+async def monitor_events():
 
     tasks = []
 
@@ -332,10 +341,11 @@ async def monitor_events(fds):
         fnhash = f"{fnname}-{hash(func)}"
         tasks.append(create_task(to_thread(*args), name=fnhash))
 
-    for fd in fds: mktask(queue_events, fd)
+    open_event_fds()
+    for fd in eventfds: mktask(queue_events, fd)
     mktask(process_events)
     mktask(watch_devices)
-    errnow(f"monitoring {len(fds)} inputs")
+    errnow(f"monitoring {len(eventfds)} inputs")
 
     done, pending = await wait(tasks, return_when=FIRST_EXCEPTION)
     ndone, npending = [len(tasks) for tasks in [done, pending]]
@@ -361,13 +371,9 @@ async def monitor_events(fds):
 
 def idled():
 
-    paths = sum(get_event_paths().values(), [])
-    dprintvar('paths', vars())
-
     signal(SIGHUP, hangup)
 
-    fds = [osopen(path, O_RDONLY) for path in paths]
-    try: run(monitor_events(fds))
+    try: run(monitor_events())
     except KeyboardInterrupt: killpg(getpgid(0), SIGTERM)
     # ^^^ todo why requires ctrl-c twice?
 
