@@ -373,10 +373,16 @@ def idled():
 
     signal(SIGHUP, hangup)
 
-    try: run(monitor_events())
-    except KeyboardInterrupt: killpg(getpgid(0), SIGTERM)
-    # ^^^ todo why requires ctrl-c twice?
+    while True:
+        try:
+            if not run(monitor_events()):
+                break
+        except KeyboardInterrupt:
+            killpg(getpgid(0), SIGTERM)
+        # ^^^ todo why requires ctrl-c twice?
+        errnow("restarting idle daemon loop")
 
+    errnow("exit requested")
     exit(EXIT_SUCCESS)
 
 ###
