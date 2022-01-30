@@ -11,7 +11,7 @@ from glob import glob
 from copy import copy
 from enum import Enum, IntEnum
 from time import strftime, sleep, localtime, time as nowtime
-from errno import ENODEV
+from errno import errorcode, ENODEV, EBADF
 from queue import SimpleQueue, Empty
 from struct import calcsize, iter_unpack
 from signal import SIGTERM, SIGHUP, signal
@@ -214,12 +214,18 @@ def queue_events(fd):
 
         stamp = 0.0
 
-        try: evbuf = read(fd, EVBUFSZ)
+        try:
+            evbuf = read(fd, EVBUFSZ)
+
         except OSError as e:
-            if e.errno == ENODEV:
+            if e.errno in [ENODEV, EBADF]:
                 restart(f"fd {fd} disappeared")
                 bomb("restart somehow did not block")
-            raise
+            else:
+                errnow(f"fd {fd} non-nodev-badf errno: {errorcode[e.errno]}")
+                raise
+            errnow("somehow still in queue_events")
+
         except Exception as e:
             err(f"queue exception: {e}"); raise
 
