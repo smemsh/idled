@@ -14,10 +14,10 @@ from time import strftime, sleep, localtime, time as nowtime
 from errno import errorcode, ENODEV, EBADF
 from queue import SimpleQueue, Empty
 from struct import calcsize, iter_unpack
-from signal import SIGTERM, SIGHUP, signal
+from signal import SIGTERM, SIGHUP, SIGUSR1, signal, pthread_kill
 from datetime import timedelta
 from argparse import ArgumentParser, RawTextHelpFormatter
-from threading import Lock
+from threading import Lock, get_ident
 from traceback import format_exception
 from contextlib import suppress
 from subprocess import check_output
@@ -25,7 +25,7 @@ from subprocess import check_output
 from os.path import basename, realpath
 from os import (
     getenv, chdir, read, kill, killpg, getpid, getpgid, execv,
-    open as osopen, O_RDONLY,
+    open as osopen, O_RDONLY, close,
     EX_OK as EXIT_SUCCESS,
     EX_SOFTWARE as EXIT_FAILURE,
 )
@@ -81,6 +81,9 @@ class Qtype(IntEnum):
     QT_MOUSE = 1
 qtypen = len(list(Qtype))
 
+# we cannot just return a value because we're using FIRST_EXCEPTION
+class IdledRescan(Exception): pass
+
 ###
 
 # idle flag will drop if N events of type Qtype in S seconds
@@ -97,8 +100,12 @@ idle = True
 # keep track of last time idle changed state to calculate interval
 lastchange = nowtime()
 
-# a few different threads need event descriptors
+# a few different threads need event descriptors and thread ids TODO sync?
+threadids = {}
 eventfds = []
+
+# make sure only one queue abort is underway
+aborting = False
 
 ###
 
@@ -201,10 +208,51 @@ def open_event_fds():
     dprintvar('paths', vars())
     eventfds = [osopen(path, O_RDONLY) for path in paths]
 
+# close(fd) and also send a signal to each queue_events(fd) thread, because
+# otherwise they will not unblock from read() and know of fd closure.
+# fortunately each Thread that asyncio.to_thread() has given us, will have
+#
+def abort_queues():
+
+    global aborting
+
+    if aborting:
+        errnow("skipping nested abort")
+        return
+    else:
+        aborting = True
+
+    errnow(f"aborting {len(eventfds)} queues")
+    try:
+        for fd in eventfds:
+            close(fd)
+            tid = threadids[fd]
+            errnow(f"interrupting thread {tid}...", end='')
+            try: pthread_kill(tid, SIGUSR1)
+            except ProcessLookupError:
+                err("already")
+                continue
+            err("done")
+
+    except OSError as e:
+        if e.errno == EBADF: pass
+        else:
+            errnow(f"unhandled error: {errorcode[e.errno]}")
+            raise
+
+    errnow("queues aborted")
+    aborting = False
+
 # get a batch of event packets from given input device fd and update
-# counters.  we should always get a multiple of EVSIZE from the read()
+# counters.  we should always get a multiple of EVSIZE from the read().
+# these threads are ephemeral and will be closed by abort_queues()
+# and new task coroutine threads started when input devices change
 #
 def queue_events(fd):
+
+    # register thread id so signal from abort_queues() can unblock read()
+    global threadids
+    threadids[fd] = get_ident()
 
     while True:
 
@@ -219,8 +267,8 @@ def queue_events(fd):
 
         except OSError as e:
             if e.errno in [ENODEV, EBADF]:
-                restart(f"fd {fd} disappeared")
-                bomb("restart somehow did not block")
+                errnow(f"fd {fd} disappeared")
+                raise IdledRescan from None # suppress implicit chaining
             else:
                 errnow(f"fd {fd} non-nodev-badf errno: {errorcode[e.errno]}")
                 raise
@@ -323,7 +371,8 @@ def watch_devices():
                 _, evtypes, _, filename = event
                 if set(evtypes).intersection(['IN_CREATE', 'IN_DELETE']):
                     if is_event_file(filename):
-                        restart(filename)
+                        errnow(f"inotify event for {filename}, rescanning")
+                        abort_queues() # trigger monitor exception
     except Exception as e:
         err(f"watch devices exception: {e}")
 
@@ -340,44 +389,68 @@ def watch_devices():
 async def monitor_events():
 
     tasks = []
+    fdtasks = []
 
     def mktask(*args):
         func = args[0]
         fnname = func.__name__
         fnhash = f"{fnname}-{hash(func)}"
-        tasks.append(create_task(to_thread(*args), name=fnhash))
+        dprint(f"making async task {fnhash}")
+        return create_task(to_thread(*args), name=fnhash)
 
-    open_event_fds()
-    for fd in eventfds: mktask(queue_events, fd)
-    mktask(process_events)
-    mktask(watch_devices)
-    errnow(f"monitoring {len(eventfds)} inputs")
 
-    done, pending = await wait(tasks, return_when=FIRST_EXCEPTION)
-    ndone, npending = [len(tasks) for tasks in [done, pending]]
-    errnow(f"canceling {npending} after {ndone} finished")
-    for task in pending:
-        # other threads in blocking calls but could except before restart
-        task.cancel()
-        with suppress(CancelledError):
-            await task
+    for taskfunc in [process_events, watch_devices]:
+        tasks.append(mktask(taskfunc))
 
-    try:
-        for task in done:
-            n = task.get_name()
-            e = task.exception()
-            trace = ''.join(format_exception(type(e), e, e.__traceback__))
-            errnow(f"done: {n}, exception: {trace}")
-    except Exception as e:
-        print(f"exception at end of monitor: {e}")
+    while True:
 
-    errnow(f"exiting monitor thread")
-    exit(EXIT_FAILURE)
+        open_event_fds()
+        for fd in eventfds: fdtasks.append(mktask(queue_events, fd))
+        errnow(f"monitoring {len(eventfds)} inputs")
+        tasks += fdtasks
+        done, pending = await wait(tasks, return_when=FIRST_EXCEPTION)
+
+        # interrupt remaining read-blocked threads so they except and finish
+        abort_queues()
+        for task in pending:
+            if task.done():
+                done.append(pending.pop(task))
+        ndone, npending = [len(tasks) for tasks in [done, pending]]
+        errnow(f"{ndone} completed, {npending} running")
+
+        pendnames = ",\x20".join([t.get_name() for t in pending])
+        errnow(f"still pending: {pendnames}")
+
+        try:
+            for task in done:
+                n = task.get_name()
+                e = task.exception()
+                if e:
+                    if isinstance(e, IdledRescan):
+                        errnow("monitor thread will rescan")
+                    else:
+                        tb = e.__traceback__
+                        tt = ''.join(format_exception(type(e), e, tb))
+                        errnow(f"done: {n}, exception: {tt}")
+                        break
+                else:
+                    errnow(f"done: {n}, clean finish")
+
+        except Exception as e:
+            print(f"exception at end of monitor loop: {e}")
+
+        tasks = pending
+
+    errnow("exiting monitor_events")
+
+    # TODO how? after break above? any other cases?
+    return False
 
 
 def idled():
 
-    signal(SIGHUP, hangup)
+    signal(SIGHUP, sighangup)
+    signal(SIGUSR1, sigusr1)
 
     while True:
         try:
@@ -422,10 +495,13 @@ def unidle(timetime):
 
 #
 
-def hangup(*_):
+def sighangup(*_):
     errnow("hangup")
     try: execv(invpath, argv) # O_CLOEXEC default since py3.4
     except Exception as e: err(e); raise
+
+def sigusr1(*_):
+    errnow("thread interruption compelled")
 
 ###
 
