@@ -374,7 +374,9 @@ def watch_devices():
                         errnow(f"inotify event for {filename}, rescanning")
                         abort_queues() # trigger monitor exception
     except Exception as e:
-        err(f"watch devices exception: {e}")
+        tb = e.__traceback__
+        tt = ''.join(format_exception(type(e), e, tb))
+        err(f"watch devices exception: {tt}")
 
 
 # spawn threads to block on input events and queue the ones we care
