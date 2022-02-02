@@ -134,6 +134,11 @@ def dprintvar(name, vars):
 def exe(cmd):
     return check_output(cmd.split()).splitlines()
 
+def print_except_trace(e, pretext):
+    tb = e.__traceback__
+    tt = ''.join(format_exception(type(e), e, tb))
+    err(f"{pretext}: {tt}")
+
 ###
 
 def check_sanity():
@@ -374,9 +379,7 @@ def watch_devices():
                         errnow(f"inotify event for {filename}, rescanning")
                         abort_queues() # trigger monitor exception
     except Exception as e:
-        tb = e.__traceback__
-        tt = ''.join(format_exception(type(e), e, tb))
-        err(f"watch devices exception: {tt}")
+        print_except_trace(e, "watch devices exception")
 
 
 # spawn threads to block on input events and queue the ones we care
@@ -431,9 +434,7 @@ async def monitor_events():
                     if isinstance(e, IdledRescan):
                         errnow("monitor thread will rescan")
                     else:
-                        tb = e.__traceback__
-                        tt = ''.join(format_exception(type(e), e, tb))
-                        errnow(f"done: {n}, exception: {tt}")
+                        print_except_trace(e, f"done: {n}")
                         break
                 else:
                     errnow(f"done: {n}, clean finish")
