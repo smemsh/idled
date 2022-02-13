@@ -7,6 +7,7 @@ __license__ = 'GPL-2.0'
 
 from re import sub, search
 from sys import argv, stderr, exit
+from ast import literal_eval as asteval
 from glob import glob
 from copy import copy
 from enum import Enum, IntEnum
@@ -21,6 +22,7 @@ from threading import Lock, get_ident
 from traceback import format_exception
 from contextlib import suppress
 from subprocess import check_output
+from configparser import ConfigParser
 
 from os.path import basename, realpath
 from os import (
@@ -37,7 +39,6 @@ from asyncio import (
 )
 
 #
-from yaml import safe_load as yloads
 from inotify.adapters import Inotify
 
 ###
@@ -176,9 +177,11 @@ def process_rcfile():
     class RunControl: pass
     rcobj = RunControl()
 
+    cfgparse = ConfigParser()
     rcfilename = getenv('IDLERC', "%s/.idlerc" % getenv('HOME'))
-    with open(rcfilename) as rcfile: rc = yloads(rcfile)
-    for k, v in rc.items(): setattr(rcobj, k, v)
+    with open(rcfilename) as rcfile:
+        cfgparse.read_string("[rc]\n" + rcfile.read())
+    for k, v in cfgparse['rc'].items(): setattr(rcobj, k, asteval(v))
     rc = rcobj
 
     unidle_n[Qtype.QT_KEY] = rc.unidle_keyboard_count
