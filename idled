@@ -485,12 +485,12 @@ def _idle(timetime, func):
     global idle
     global lastchange
     now = nowtime()
-    invname = func.__name__
-    idle = True if invname == 'afk' else False
+    inv = func.__name__
+    idle = True if inv == 'afk' else False
     elapsed = now - lastchange
     stamp = timetimefmt(timetime)
     since = timetimehms(elapsed)
-    log(f"{stamp} {since:>9s} {invname:7s}")
+    log(f"{stamp} {since:>9s} {inv:7s}")
     lastchange = now
 
 def afk(timetime):
