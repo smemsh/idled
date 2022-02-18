@@ -105,9 +105,6 @@ lastchange = nowtime()
 threadids = {}
 eventfds = []
 
-# make sure only one queue abort is underway
-aborting = False
-
 ###
 
 def log(*args, **kwargs):
@@ -222,16 +219,9 @@ def open_event_fds():
 #
 def abort_queues():
 
-    global aborting
-
-    if aborting:
-        errnow("skipping nested abort")
-        return
-    else:
-        aborting = True
-
-    errnow(f"aborting {len(eventfds)} queues")
     try:
+        exclusive.acquire()
+        errnow(f"aborting {len(eventfds)} queues")
         for fd in eventfds:
             close(fd)
             tid = threadids[fd]
@@ -248,8 +238,10 @@ def abort_queues():
             errnow(f"unhandled error: {errorcode[e.errno]}")
             raise
 
+    finally:
+        exclusive.release()
+
     errnow("queues aborted")
-    aborting = False
 
 # get a batch of event packets from given input device fd and update
 # counters.  we should always get a multiple of EVSIZE from the read().
