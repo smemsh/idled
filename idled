@@ -189,7 +189,6 @@ def process_rcfile():
 
 def restart(reason):
 
-    global lock
     lock.acquire()
     errnow(f"restart in {rc.restart_secs}s, reason: {reason}")
     sleep(rc.restart_secs) # allow input device change events to batch
