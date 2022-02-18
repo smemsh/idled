@@ -74,7 +74,7 @@ class Evtype(Enum):
 evq = SimpleQueue()
 
 # for places we need first use to block successors, eg restart()
-exclusive = Lock()
+lock = Lock()
 
 # one queue for kbd+mouse events, inserted as (Qtype, timestamp) tuples
 class Qtype(IntEnum):
@@ -189,8 +189,8 @@ def process_rcfile():
 
 def restart(reason):
 
-    global exclusive
-    exclusive.acquire()
+    global lock
+    lock.acquire()
     errnow(f"restart in {rc.restart_secs}s, reason: {reason}")
     sleep(rc.restart_secs) # allow input device change events to batch
     kill(pid, SIGHUP) # signal.raise_signal() seems not to kill main pid
@@ -220,7 +220,7 @@ def open_event_fds():
 def abort_queues():
 
     try:
-        exclusive.acquire()
+        lock.acquire()
         errnow(f"aborting {len(eventfds)} queues")
         for fd in eventfds:
             close(fd)
@@ -239,7 +239,7 @@ def abort_queues():
             raise
 
     finally:
-        exclusive.release()
+        lock.release()
 
     errnow("queues aborted")
 
