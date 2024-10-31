@@ -19,6 +19,10 @@ changes.
 Lots of integration possibilities with the window manager and time
 tracking tools.
 
+| scott@smemsh.net
+| https://github.com/smemsh/idled/
+| https://spdx.org/licenses/GPL-2.0
+
 ____
 
 .. contents::
@@ -65,8 +69,7 @@ moment).
 Inotify
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Requires: inotify-0.2.10+
-| https://pypi.org/project/inotify/
+Requires: inotify-0.2.10+ | https://pypi.org/project/inotify/
 
 We use inotify lib from pypi, but what we use from it is small and we
 should just port this into idled.  We have to go through unnecessary
