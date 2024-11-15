@@ -5,8 +5,11 @@ __url__     = 'https://github.com/smemsh/idled'
 __author__  = 'Scott Mcdermott <scott@smemsh.net>'
 __license__ = 'GPL-2.0'
 
+from sys import exit, hexversion
+if hexversion < 0x030900f0: exit("minpython: %s" % hexversion)
+
 from re import sub, search
-from sys import argv, stderr, exit
+from sys import argv, stdout, stderr
 from ast import literal_eval as asteval
 from glob import glob
 from copy import copy
@@ -19,14 +22,14 @@ from signal import SIGTERM, SIGHUP, SIGUSR1, signal, pthread_kill
 from datetime import timedelta
 from argparse import ArgumentParser, RawTextHelpFormatter
 from threading import Lock, get_ident
-from traceback import format_exception
+from traceback import format_exception, print_exc
 from contextlib import suppress
 from subprocess import check_output
 from configparser import ConfigParser
 
 from os.path import basename, realpath
 from os import (
-    getenv, chdir, read, kill, killpg, getpid, getpgid, execv,
+    getenv, unsetenv, chdir, read, kill, killpg, getpid, getpgid, execv,
     open as osopen, O_RDONLY, close, write,
     EX_OK as EXIT_SUCCESS,
     EX_SOFTWARE as EXIT_FAILURE,
@@ -525,20 +528,29 @@ def main():
 
 if __name__ == "__main__":
 
-    from sys import hexversion
-    if hexversion < 0x03090000:
-        bomb("minimum python 3.9")
-
-    from bdb import BdbQuit
-    debug = int(getenv('DEBUG') or 0)
-    if debug:
-        from pprint import pp
-        err('debug: enabled')
-
     invpath = realpath(argv[0])
     invname = basename(argv[0])
     args = argv[1:]
     pid = getpid()
 
+    from bdb import BdbQuit
+    if debug := int(getenv('DEBUG') or 0):
+        import pdb
+        from pprint import pp
+        err('debug: enabled')
+        unsetenv('DEBUG') # otherwise forked children hang
+
     try: main()
     except BdbQuit: bomb("debug: stop")
+    except SystemExit: raise
+    except KeyboardInterrupt: bomb("interrupted")
+    except:
+        print_exc(file=stderr)
+        if debug: pdb.post_mortem()
+    finally: # cpython bug 55589
+        try: stdout.flush()
+        finally:
+            try: stdout.close()
+            finally:
+                try: stderr.flush()
+                finally: stderr.close()
