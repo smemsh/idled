@@ -338,9 +338,26 @@ def process_events():
 
     while True:
 
-        timeout = rc.idle_secs if not idle else None
-        try: qtype, timetime = evq.get(timeout=timeout)
-        except Empty: afk(nowtime()); continue
+        interval_finished = False
+        already_warned = False
+
+        timeout = rc.idle_secs - rc.warn_secs if not idle else None
+        while True:
+            try:
+                qtype, timetime = evq.get(timeout=timeout)
+                break
+            except Empty:
+                if already_warned:
+                    afk(nowtime())
+                    interval_finished = True
+                    break
+                else:
+                    soon(nowtime())
+                    timeout = rc.warn_secs
+                    already_warned = True
+
+        if interval_finished:
+            continue
 
         # oldest entry, at oldidx, will always be the slot after newest
         # (current event) index, which is the same as the maximally
@@ -480,19 +497,23 @@ def _idle(timetime, func):
     global idle
     global lastchange
     now = nowtime()
+    stamp = timetimefmt(timetime)
+
     inv = func.__name__
     idle = True if inv == 'afk' else False
-    elapsed = now - lastchange
-    stamp = timetimefmt(timetime)
+    elapsed = now - lastchange if inv != 'soon' else 0
     since = timetimehms(elapsed)
     log(f"{stamp} {since:>9s} {inv:7s}")
-    lastchange = now
+    if inv != 'soon': lastchange = now
 
 def afk(timetime):
     _idle(timetime, afk)
 
 def unidle(timetime):
     _idle(timetime, unidle)
+
+def soon(timetime):
+    _idle(timetime, soon)
 
 #
 

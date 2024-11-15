@@ -6,6 +6,8 @@ unidle_keyboard_secs: 10
 unidle_mouse_count: 60
 unidle_mouse_secs: 7
 
-idle_secs: 30
+idle_secs: 60
+warn_secs: 10
 
+rescan_secs: 4
 restart_secs: 3
