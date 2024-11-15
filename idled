@@ -493,14 +493,14 @@ def unidle(timetime):
 #
 
 def sighangup(*_):
-    write(stderr.fileno(), "handling hangup")
+    write(stderr.fileno(), b"handling hangup\n")
     try: execv(invpath, argv) # O_CLOEXEC default since py3.4
     except Exception as e:
-        write(stderr.fileno(), "re-invoke failure")
+        write(stderr.fileno(), b"re-invoke failure\n")
         raise RuntimeError("attempt to re-raise") from e
 
 def sigusr1(*_):
-    write(stderr.fileno(), "thread interruption compelled")
+    write(stderr.fileno(), b"thread interruption compelled\n")
 
 ###
 
