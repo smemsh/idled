@@ -112,6 +112,7 @@ eventfds = []
 
 def log(*args, **kwargs):
     print(*args, **kwargs)
+    kwargs.get('file', stdout).flush()
 
 def err(*args, **kwargs):
     log(*args, file=stderr, **kwargs)
