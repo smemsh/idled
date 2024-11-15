@@ -27,7 +27,7 @@ from configparser import ConfigParser
 from os.path import basename, realpath
 from os import (
     getenv, chdir, read, kill, killpg, getpid, getpgid, execv,
-    open as osopen, O_RDONLY, close,
+    open as osopen, O_RDONLY, close, write,
     EX_OK as EXIT_SUCCESS,
     EX_SOFTWARE as EXIT_FAILURE,
 )
@@ -493,12 +493,14 @@ def unidle(timetime):
 #
 
 def sighangup(*_):
-    errnow("hangup")
+    write(stderr.fileno(), "handling hangup")
     try: execv(invpath, argv) # O_CLOEXEC default since py3.4
-    except Exception as e: err(e); raise
+    except Exception as e:
+        write(stderr.fileno(), "re-invoke failure")
+        raise RuntimeError("attempt to re-raise") from e
 
 def sigusr1(*_):
-    errnow("thread interruption compelled")
+    write(stderr.fileno(), "thread interruption compelled")
 
 ###
 
