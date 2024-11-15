@@ -471,7 +471,7 @@ def timetimefmt(timetime=None):
     return strftime("%Y%m%d%H%M%S", localtime(timetime))
 
 def timetimehms(secs):
-    return sub('\.\d+$', '', str(timedelta(seconds=secs)))
+    return sub(r'\.\d+$', '', str(timedelta(seconds=secs)))
 
 #
 
